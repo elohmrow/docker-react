@@ -1,5 +1,7 @@
 # builder is a "phase"
-FROM node:16-alpine as builder
+###FROM node:16-alpine as builder
+FROM node:16-alpine
+
 WORKDIR '/app'
 COPY package.json .
 RUN npm install
@@ -9,7 +11,8 @@ RUN npm run build
 # only one FROM allowed per phase, so this signifies a new phase
 FROM nginx
 EXPOSE 80
-COPY --from=builder /app/build /usr/share/nginx/html
+###COPY --from=builder /app/build /usr/share/nginx/html
+COPY --from=0 /app/build /usr/share/nginx/html
 # ^ copy the result from the 'builder' phase into the default nginx dir
 # note: we don't have to start nginx ... that's the default cmd for the nginx container
 # run like so:
