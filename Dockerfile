@@ -8,6 +8,7 @@ RUN npm run build
 
 # only one FROM allowed per phase, so this signifies a new phase
 FROM nginx
+EXPOSE 80
 COPY --from=builder /app/build /usr/share/nginx/html
 # ^ copy the result from the 'builder' phase into the default nginx dir
 # note: we don't have to start nginx ... that's the default cmd for the nginx container
