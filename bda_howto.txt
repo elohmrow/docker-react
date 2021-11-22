@@ -1,0 +1,83 @@
+npx create-react-app frontend
+
+npm run start --> dev mode
+        test
+        build
+
+npm run build -->  build/static/js/ <-- in here is a js file which is the actual app we'll package up into a docker
+container to run
+
+or ... yarn build
+
+ghost@theMachine frontend % docker build -f Dockerfile.dev .
+^ then remove node_modules/
+^ that removes "duplicate dependencies" and makes the build faster
+
+docker run -it -p 3000:3000 IMAGE_ID
+
+we use docker volumes to refelct changes in code on dev build without having to rebuild the container every time.  the
+volume sets up a reference from the docker container to the code on the local folder ... the stuff that is copied with
+"COPY . .":
+$ docker run -p 3000:3000 -v /app/node_modules -v $(pwd):/app <image_id>
+                              ^ 
+    - the $(pwd):/app bit says take everything in /app/node_modules and map it to $(pwd):/app ... so take everything in
+                                                                                          our pwd and map it to the /app
+                                                                                          folder on the container.
+
+but we deleted the node_modules folder, so we need the first -v too ... otherwise get an error like react-scripts not
+found
+
+so any time our progr tries to access soemthing in the /app dir, it's going to reach outside the container to our pwd on
+local (dev) machine.
+
+docker-compose down && docker-compose up --build
+
+$ docker run <ctr-id> <non-default-start-cmd>
+e.g., $docker run <ctr-id> npm run test
+
+tests are run in a tmp container ... will have same problems as above unless we map to those as well ... iow, without
+mapping, we have to rebuild app to change test suite.
+^ could solve this in docker-compose by setting up a service for testing
+^ or, by attaching to the existing ctr ... once attached, can execute a command insde the container to run the tests ...
+that ctr already has the volume mappings, so it'll work
+ ... do that like so: `docker exec -it 28ae1a789d02 npm run test`
+
+when you add a service to your dockerfile, it's not required, but is a best practice to docker-compose up --build to
+make sure you catch those
+
+downside to the multi-server approach is all the output comes in the docker-compose window and you can't attach unless
+you open another terminal window and
+sepearate the output from the test output
+^ even then you can't interact with it.  this means if you use docker-compose, there is no easy way to jump into a ctr
+and interact with it.
+^ this is because of the diff processes running in the ctr:
+ghost@theMachine frontend % docker exec -it bf196abc40c1 sh
+/app # ps
+PID   USER     TIME  COMMAND
+    1 root      0:00 npm run test
+   18 root      0:00 node /app/node_modules/.bin/react-scripts test
+   25 root      0:05 /usr/local/bin/node /app/node_modules/react-scripts/scripts/test.j
+   62 root      0:00 sh
+   68 root      0:00 ps
+/app #
+^^ so npm is running in the test ctr as a proc, and it is spawning a new node process ... that 2nd process is the one
+actually running our test suites and exec our cmds. problem is docker attach puts us in stdin for the first process
+(process id = 1),
+         npm.  so we actually can't access that process. lesson 84.
+
+         we need to attach to the 2nd process but we can only get a handle on the 1st process with docker compose.
+
+
+
+
+npm run build puts everything together into a single js at the end to deploy onto a container. the dev env has a ctr
+which has a dev server ... each time browser calls our page, it's actually calling this dev server, which then combines
+index.html and main.js (or $whatever.js) and delivers that back to the browser for the end user.
+
+problem is, in prod, we don't have that dev server.  we just have the index.html and $whatever.js.  so we need a web
+server, like nginx
+
+think also about the dev server ... it does a lot of watching and processing the fs files so when we make changes ...
+don't need any of that in prod.  also don't need tests in prod
+
+
